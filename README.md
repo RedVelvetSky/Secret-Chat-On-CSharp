@@ -1,2 +1,2 @@
 # Secret-Chat-On-CSharp
-My intermediate C# project for university
+My intermediate **WPF C#** project for university. **Secure** and **minimalistic** chat.
