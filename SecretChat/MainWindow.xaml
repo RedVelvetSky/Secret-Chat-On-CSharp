@@ -4,15 +4,16 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="Simple Secure Chat" Height="450" Width="800">
+        Title="Simple Secure Chat" Height="450" Width="800"
+        MinWidth="700" MinHeight="300">
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="30" />
             <RowDefinition/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Orientation="Horizontal">
+        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center">
             <Label Content="Your ID:"/>
             <TextBox x:Name="ClientIdTextBox" Width="100" Margin="5"/>
             <Label Content="Recipient ID:"/>
@@ -23,7 +24,7 @@
 
         <TextBox x:Name="ChatTextBox" Grid.Row="1" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" AcceptsReturn="True"/>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal">
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center">
             <TextBox x:Name="MessageTextBox" Width="600" Margin="5"/>
             <Button x:Name="SendMessageButton" Content="Send" Click="SendMessageButton_Click" Margin="5" IsEnabled="False"/>
         </StackPanel>
