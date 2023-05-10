@@ -6,27 +6,27 @@
         mc:Ignorable="d"
         Title="Simple Secure Chat" Height="450" Width="800"
         MinWidth="700" MinHeight="300">
-    <Grid>
+    <Grid Background="#222">
         <Grid.RowDefinitions>
-            <RowDefinition Height="30" />
+            <RowDefinition Height="40" />
             <RowDefinition/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center">
-            <Label Content="Your ID:"/>
-            <TextBox x:Name="ClientIdTextBox" Width="100" Margin="5"/>
-            <Label Content="Recipient ID:"/>
-            <TextBox x:Name="RecipientIdTextBox" Width="100" Margin="5"/>
-            <Button x:Name="ConnectButton" Content="Connect" Click="ConnectButton_Click" Margin="5"/>
-            <Button x:Name="DisconnectButton" Content="Disconnect" Click="DisconnectButton_Click" Margin="5" IsEnabled="False"/>
+        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="5">
+            <Label Content="Your ID:" Foreground="White"/>
+            <TextBox x:Name="ClientIdTextBox" Width="100" Margin="5" BorderThickness="1" BorderBrush="#444" Background="#222" Foreground="White"/>
+            <Label Content="Recipient ID:" Foreground="White"/>
+            <TextBox x:Name="RecipientIdTextBox" Width="100" Margin="5" BorderThickness="1" BorderBrush="#444" Background="#222" Foreground="White"/>
+            <Button x:Name="ConnectButton" Content="Connect" Click="ConnectButton_Click" Margin="5" BorderThickness="1" BorderBrush="#444" Background="#007ACC" Foreground="White"/>
+            <Button x:Name="DisconnectButton" Content="Disconnect" Click="DisconnectButton_Click" Margin="5" IsEnabled="False" BorderThickness="1" BorderBrush="#444" Background="Red" Foreground="Black"/>
         </StackPanel>
 
-        <TextBox x:Name="ChatTextBox" Grid.Row="1" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" AcceptsReturn="True"/>
+        <TextBox x:Name="ChatTextBox" Grid.Row="1" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" AcceptsReturn="True" Margin="5" BorderThickness="1" BorderBrush="#444" Background="#222" Foreground="White"/>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center">
-            <TextBox x:Name="MessageTextBox" Width="600" Margin="5"/>
-            <Button x:Name="SendMessageButton" Content="Send" Click="SendMessageButton_Click" Margin="5" IsEnabled="False"/>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="5">
+            <TextBox x:Name="MessageTextBox" Width="600" Margin="5" BorderThickness="1" BorderBrush="#444" Background="#222" Foreground="White"/>
+            <Button x:Name="SendMessageButton" Content="Send" Click="SendMessageButton_Click" Margin="5" IsEnabled="False" BorderThickness="1" BorderBrush="#444" Background="#007ACC" Foreground="Black"/>
         </StackPanel>
     </Grid>
 </Window>
