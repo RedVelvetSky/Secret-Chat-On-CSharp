@@ -69,6 +69,7 @@ namespace SimpleSecureChatServer
                         {
                             byte[] messageBytes = Encoding.UTF8.GetBytes($"{clientId}: {messageContent}");
                             await recipientStream.WriteAsync(messageBytes, 0, messageBytes.Length);
+                            Console.WriteLine($"Client '{clientId}' has sent message '{messageContent}' to recipient '{recipientId}'.");
                         }
                         else
                         {
