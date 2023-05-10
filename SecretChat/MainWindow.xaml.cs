@@ -103,20 +103,31 @@ namespace SecretChat
                 chain = new X509Chain();
                 chain.ChainPolicy.ExtraStore.Add(caCert);
 
-                // Check chain build status
-                bool chainIsValid = chain.Build(new X509Certificate2(certificate));
+            // Disable the revocation check
+            chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+
+            // Check chain build status
+            bool chainIsValid = chain.Build(new X509Certificate2(certificate));
 
                 if (!chainIsValid)
                 {
                     foreach (X509ChainStatus chainStatus in chain.ChainStatus)
                     {
-                        Console.WriteLine($"Chain error: {chainStatus.StatusInformation}");
+                        System.Windows.MessageBox.Show($"Chain error: {chainStatus.StatusInformation}");
                     }
                 }
 
-            //return chainIsValid;
-            return true;
-            }
+                //if (sslPolicyErrors != SslPolicyErrors.None)
+                //{
+                //    System.Windows.MessageBox.Show($"SSL policy error: {sslPolicyErrors}");
+                //    return false;
+                //}
+                // have had dimb issue while creating cert, if cert is created carefully there would be no errors 
+
+
+            return chainIsValid;
+            //return true;
+        }
 
     }
 
