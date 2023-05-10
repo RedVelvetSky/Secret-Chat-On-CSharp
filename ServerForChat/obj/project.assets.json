@@ -13,11 +13,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "E:\\Cybersec\\CSharp\\ServerForChat\\ServerForChat.csproj",
+      "projectUniqueName": "E:\\Cybersec\\Secret-Chat-On-CSharp\\ServerForChat\\ServerForChat.csproj",
       "projectName": "ServerForChat",
-      "projectPath": "E:\\Cybersec\\CSharp\\ServerForChat\\ServerForChat.csproj",
+      "projectPath": "E:\\Cybersec\\Secret-Chat-On-CSharp\\ServerForChat\\ServerForChat.csproj",
       "packagesPath": "C:\\Users\\SpaceDimension\\.nuget\\packages\\",
-      "outputPath": "E:\\Cybersec\\CSharp\\ServerForChat\\obj\\",
+      "outputPath": "E:\\Cybersec\\Secret-Chat-On-CSharp\\ServerForChat\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\SpaceDimension\\AppData\\Roaming\\NuGet\\NuGet.Config",
