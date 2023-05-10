@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
@@ -32,9 +33,9 @@ namespace SecretChat
             _sslStream = new SslStream(_client.GetStream(), false, new RemoteCertificateValidationCallback(ValidateServerCertificate), null);
 
             // Authenticate the client
-            X509Certificate2 clientCertificate = new X509Certificate2("E:\\Cybersec\\Secret-Chat-On-CSharp\\SecretChat\\server.pfx", "4-puklvife#9");
+            X509Certificate2 clientCertificate = new X509Certificate2("E:\\Cybersec\\Secret-Chat-On-CSharp\\SecretChat\\client.pfx", "I!vW70n1xnoH");
             var clientCertificates = new X509CertificateCollection(new X509Certificate[] { clientCertificate });
-            await _sslStream.AuthenticateAsClientAsync("127.0.0.1", clientCertificates, SslProtocols.Tls12, false);
+            await _sslStream.AuthenticateAsClientAsync("127.0.0.1", clientCertificates, SslProtocols.Tls13, false);
 
             // Send the unique client ID to the server for registration
             byte[] clientIdBytes = Encoding.UTF8.GetBytes(ClientIdTextBox.Text);
@@ -89,11 +90,34 @@ namespace SecretChat
             DisconnectButton.IsEnabled = false;
         }
 
-        private static bool ValidateServerCertificate(object sender, X509Certificate? certificate, X509Chain? chain, SslPolicyErrors sslPolicyErrors)
-        {
-            // In a real application, you should validate the server certificate properly
+        private static bool ValidateServerCertificate(
+        object sender,
+        X509Certificate certificate,
+        X509Chain chain,
+        SslPolicyErrors sslPolicyErrors)
+            {
+                // Load the CA certificate
+                X509Certificate2 caCert = new X509Certificate2("E:\\Cybersec\\Secret-Chat-On-CSharp\\SecretChat\\cacert.pem");
+
+                // Create a new X509 chain
+                chain = new X509Chain();
+                chain.ChainPolicy.ExtraStore.Add(caCert);
+
+                // Check chain build status
+                bool chainIsValid = chain.Build(new X509Certificate2(certificate));
+
+                if (!chainIsValid)
+                {
+                    foreach (X509ChainStatus chainStatus in chain.ChainStatus)
+                    {
+                        Console.WriteLine($"Chain error: {chainStatus.StatusInformation}");
+                    }
+                }
+
+            //return chainIsValid;
             return true;
-        }
+            }
+
     }
 
 }
