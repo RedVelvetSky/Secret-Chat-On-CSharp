@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Net.Security;
 using System.Security.Authentication;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
@@ -13,6 +14,7 @@ namespace SimpleSecureChatServer
     class Program
     {
         private static ConcurrentDictionary<string, SslStream> _connectedClients = new ConcurrentDictionary<string, SslStream>();
+        private static ConcurrentDictionary<string, ECDiffieHellmanPublicKey> _otherClientsPublicKeys = new ConcurrentDictionary<string, ECDiffieHellmanPublicKey>();
 
         static async Task Main(string[] args)
         {
@@ -41,6 +43,8 @@ namespace SimpleSecureChatServer
         {
             {
                 string clientId = null;
+                ECDiffieHellmanPublicKey clientPublicKey = null;
+
                 using (var sslStream = new SslStream(client.GetStream(), false, new RemoteCertificateValidationCallback(ValidateClientCertificate), null))
                 {
                     // Authenticate the server
@@ -51,36 +55,70 @@ namespace SimpleSecureChatServer
 
                     // Register the client and store its ID
                     bytesRead = await sslStream.ReadAsync(buffer, 0, buffer.Length);
-                clientId = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                _connectedClients.TryAdd(clientId, sslStream);
-                Console.WriteLine($"Client '{clientId}' connected.");
+                    clientId = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                    _connectedClients.TryAdd(clientId, sslStream);
+                    Console.WriteLine($"Client '{clientId}' connected.");
+
+                    // Receive the client's public key
+                    bytesRead = await sslStream.ReadAsync(buffer, 0, buffer.Length);
+                    byte[] publicKeyBytes = new byte[bytesRead];
+                    Array.Copy(buffer, publicKeyBytes, bytesRead);
+                    clientPublicKey = ECDiffieHellmanCngPublicKey.FromByteArray(publicKeyBytes, CngKeyBlobFormat.EccPublicBlob);
+
+                    _otherClientsPublicKeys[clientId] = clientPublicKey;
+                    Console.WriteLine($"Client '{clientId}' has {_otherClientsPublicKeys[clientId]} public key.");
+
+                    // Broadcast the new client's public key to all other clients
+                    foreach (var otherClient in _connectedClients)
+                    {
+                        if (otherClient.Key != clientId)
+                        {
+                            byte[] publicKeyMessage = Encoding.UTF8.GetBytes($"PUBLICKEY|{clientId}|{Convert.ToBase64String(clientPublicKey.ToByteArray())}");
+                            await otherClient.Value.WriteAsync(publicKeyMessage, 0, publicKeyMessage.Length);
+                        }
+                    }
+
+                    // Send all the public keys of already connected clients to the new client
+                    foreach (var otherClientPublicKey in _otherClientsPublicKeys)
+                    {
+                        if (otherClientPublicKey.Key != clientId)
+                        {
+                            byte[] publicKeyMessage = Encoding.UTF8.GetBytes($"PUBLICKEY|{otherClientPublicKey.Key}|{Convert.ToBase64String(otherClientPublicKey.Value.ToByteArray())}");
+                            await sslStream.WriteAsync(publicKeyMessage, 0, publicKeyMessage.Length);
+                        }
+                    }
+
+                    string recipientId = null;
+                    byte[] messageBytes = null;
 
                     while ((bytesRead = await sslStream.ReadAsync(buffer, 0, buffer.Length)) != 0)
                     {
-                        // Process the received message
-                        string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                        string[] messageParts = message.Split('|');
-
-                        if (messageParts.Length == 2)
+                        if (recipientId == null)
                         {
-                            string recipientId = messageParts[0];
-                            string messageContent = messageParts[1];
-
-                            if (_connectedClients.TryGetValue(recipientId, out SslStream recipientStream))
-                            {
-                                byte[] messageBytes = Encoding.UTF8.GetBytes($"{clientId}: {messageContent}");
-                                await recipientStream.WriteAsync(messageBytes, 0, messageBytes.Length);
-                                Console.WriteLine($"Client '{clientId}' has sent message '{messageContent}' to recipient '{recipientId}'.");
-                            }
-                            else
-                            {
-                                Console.WriteLine($"Message routing failed. Recipient '{recipientId}' not found.");
-                            }
+                            // The first message is the recipient ID
+                            recipientId = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                            continue;
                         }
                         else
                         {
-                            Console.WriteLine("Invalid message format received.");
+                            // The second message is the encrypted message content
+                            messageBytes = new byte[bytesRead];
+                            Array.Copy(buffer, messageBytes, bytesRead);
                         }
+
+                        if (_connectedClients.TryGetValue(recipientId, out SslStream recipientStream))
+                        {
+                            await recipientStream.WriteAsync(messageBytes, 0, messageBytes.Length);
+                            Console.WriteLine($"Client '{clientId}' has sent a message to recipient '{recipientId}'.");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"Message routing failed. Recipient '{recipientId}' not found.");
+                        }
+
+                        // Reset for the next pair of messages
+                        recipientId = null;
+                        messageBytes = null;
                     }
                 }
 
@@ -88,6 +126,13 @@ namespace SimpleSecureChatServer
                 {
                     _connectedClients.TryRemove(clientId, out _);
                     Console.WriteLine($"Client '{clientId}' disconnected.");
+
+                    // Broadcast the client's disconnection to all other clients
+                    foreach (var otherClient in _connectedClients)
+                    {
+                        byte[] disconnectMessage = Encoding.UTF8.GetBytes($"DISCONNECT|{clientId}");
+                        await otherClient.Value.WriteAsync(disconnectMessage, 0, disconnectMessage.Length);
+                    }
                 }
             }
 

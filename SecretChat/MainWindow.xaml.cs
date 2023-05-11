@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
@@ -15,10 +17,15 @@ namespace SecretChat
 
         private TcpClient? _client;
         private SslStream? _sslStream;
+        private ECDiffieHellmanCng ecdh;
+        private Dictionary<string, ECDiffieHellmanPublicKey> _otherClientsPublicKeys = new Dictionary<string, ECDiffieHellmanPublicKey>();
+        private Aes aes;
 
         public MainWindow()
         {
             InitializeComponent();
+            ecdh = new ECDiffieHellmanCng();
+            aes = Aes.Create();
         }
 
         private async void ConnectButton_Click(object sender, RoutedEventArgs e)
@@ -41,6 +48,13 @@ namespace SecretChat
             byte[] clientIdBytes = Encoding.UTF8.GetBytes(ClientIdTextBox.Text);
             await _sslStream.WriteAsync(clientIdBytes, 0, clientIdBytes.Length);
 
+            // Send the ECDH public key to the server
+            byte[] publicKeyBytes = ecdh.PublicKey.ToByteArray();
+            await _sslStream.WriteAsync(publicKeyBytes, 0, publicKeyBytes.Length);
+
+            // Start listening for public keys
+            _ = ListenForPublicKeysAsync();
+
             // Set the UI state to connected
             ConnectButton.IsEnabled = false;
             SendMessageButton.IsEnabled = true;
@@ -49,6 +63,43 @@ namespace SecretChat
             // Start listening for messages
             _ = ListenForMessagesAsync();
         }
+
+        private async Task ListenForPublicKeysAsync()
+        {
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+
+            while ((bytesRead = await _sslStream.ReadAsync(buffer, 0, buffer.Length)) != 0)
+            {
+                string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+
+                if (message.StartsWith("PUBLICKEY|"))
+                {
+                    string[] parts = message.Split('|');
+                    if (parts.Length == 3)
+                    {
+
+                        ChatTextBox.AppendText($"Key recieved!");
+                        string senderId = parts[1];
+                        string publicKeyString = parts[2];
+                        byte[] publicKeyBytes = Convert.FromBase64String(publicKeyString);
+                        ECDiffieHellmanPublicKey senderPublicKey = ECDiffieHellmanCngPublicKey.FromByteArray(publicKeyBytes, CngKeyBlobFormat.EccPublicBlob);
+
+                        ChatTextBox.AppendText($"Public key for {senderId} is {publicKeyString}.");
+
+                        if (!_otherClientsPublicKeys.ContainsKey(senderId))
+                        {
+                            _otherClientsPublicKeys.Add(senderId, senderPublicKey);
+                        }
+                        else
+                        {
+                            _otherClientsPublicKeys[senderId] = senderPublicKey;
+                        }
+                    }
+                }
+            }
+        }
+
 
         private async Task ListenForMessagesAsync()
         {
@@ -59,8 +110,27 @@ namespace SecretChat
             {
                 while ((bytesRead = await _sslStream.ReadAsync(buffer, 0, buffer.Length)) != 0)
                 {
-                    string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                    Dispatcher.Invoke(() => ChatTextBox.AppendText($"{message}\n"));
+                    // Decrypt the message
+                    string senderId = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+
+                    if (_otherClientsPublicKeys.ContainsKey(senderId))
+                    {
+                        byte[] sharedSecret = ecdh.DeriveKeyMaterial(_otherClientsPublicKeys[senderId]);
+                        aes.Key = sharedSecret;
+
+                        using ICryptoTransform decryptor = aes.CreateDecryptor();
+                        byte[] decryptedMessage = decryptor.TransformFinalBlock(buffer, 0, bytesRead);
+
+                        string message = Encoding.UTF8.GetString(decryptedMessage);
+                        Dispatcher.Invoke(() => ChatTextBox.AppendText($"{message}\n"));
+                    }
+                    else
+                    {
+                        
+                        ECDiffieHellmanPublicKey senderPublicKey = ECDiffieHellmanCngPublicKey.FromByteArray(buffer, CngKeyBlobFormat.EccPublicBlob);
+                        ChatTextBox.AppendText($"Added key: {senderPublicKey}");
+                        _otherClientsPublicKeys.Add(senderId, senderPublicKey);
+                    }
                 }
             }
             catch (IOException)
@@ -73,8 +143,27 @@ namespace SecretChat
         {
             if (!string.IsNullOrEmpty(RecipientIdTextBox.Text) && !string.IsNullOrEmpty(MessageTextBox.Text))
             {
-                byte[] messageBytes = Encoding.UTF8.GetBytes($"{RecipientIdTextBox.Text}|{MessageTextBox.Text}");
-                await _sslStream.WriteAsync(messageBytes, 0, messageBytes.Length);
+                byte[] recipientIdBytes = Encoding.UTF8.GetBytes(RecipientIdTextBox.Text);
+
+                // Send the recipient ID
+                await _sslStream.WriteAsync(recipientIdBytes, 0, recipientIdBytes.Length);
+
+                // Then send the encrypted message
+                byte[] messageBytes = Encoding.UTF8.GetBytes(MessageTextBox.Text);
+
+                // Encrypt the message
+                byte[] sharedSecret = ecdh.DeriveKeyMaterial(_otherClientsPublicKeys[RecipientIdTextBox.Text]);
+                if (!_otherClientsPublicKeys.ContainsKey(RecipientIdTextBox.Text))
+                {
+                    ChatTextBox.AppendText($"Error: Public key for client {RecipientIdTextBox.Text} not found.");
+                    return;
+                }
+                aes.Key = sharedSecret;
+
+                using ICryptoTransform encryptor = aes.CreateEncryptor();
+                byte[] encryptedMessage = encryptor.TransformFinalBlock(messageBytes, 0, messageBytes.Length);
+
+                await _sslStream.WriteAsync(encryptedMessage, 0, encryptedMessage.Length);
                 ChatTextBox.AppendText($"You: {MessageTextBox.Text}\n");
                 MessageTextBox.Clear();
             }
