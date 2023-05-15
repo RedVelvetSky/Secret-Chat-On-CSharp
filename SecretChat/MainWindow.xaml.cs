@@ -33,16 +33,25 @@ namespace SecretChat
             string serverIP = "127.0.0.1";
             int serverPort = 5000;
 
+            //ChatTextBox.AppendText($"\n");
+            ChatTextBox.AppendText($"\n Connecting to the server...");
+
             // Connect to the server
             _client = new TcpClient();
             await _client.ConnectAsync(serverIP, serverPort);
 
+            ChatTextBox.AppendText($"\n Connected to the server.");
+
             _sslStream = new SslStream(_client.GetStream(), false, new RemoteCertificateValidationCallback(ValidateServerCertificate), null);
+
+            ChatTextBox.AppendText($"\n Authenticating the client...");
 
             // Authenticate the client
             X509Certificate2 clientCertificate = new X509Certificate2("E:\\Cybersec\\Secret-Chat-On-CSharp\\SecretChat\\client.pfx", "I!vW70n1xnoH");
             var clientCertificates = new X509CertificateCollection(new X509Certificate[] { clientCertificate });
             await _sslStream.AuthenticateAsClientAsync("127.0.0.1", clientCertificates, SslProtocols.Tls13, false);
+
+            ChatTextBox.AppendText($"\n Client authenticated.");
 
             // Send the unique client ID to the server for registration
             byte[] clientIdBytes = Encoding.UTF8.GetBytes(ClientIdTextBox.Text);
@@ -79,13 +88,13 @@ namespace SecretChat
                     if (parts.Length == 3)
                     {
 
-                        ChatTextBox.AppendText($"Key recieved!");
+                        ChatTextBox.AppendText($"\nKey recieved!");
                         string senderId = parts[1];
                         string publicKeyString = parts[2];
                         byte[] publicKeyBytes = Convert.FromBase64String(publicKeyString);
                         ECDiffieHellmanPublicKey senderPublicKey = ECDiffieHellmanCngPublicKey.FromByteArray(publicKeyBytes, CngKeyBlobFormat.EccPublicBlob);
 
-                        ChatTextBox.AppendText($"Public key for {senderId} is {publicKeyString}.");
+                        ChatTextBox.AppendText($"\nPublic key for {senderId} is {publicKeyString}.");
 
                         if (!_otherClientsPublicKeys.ContainsKey(senderId))
                         {
@@ -110,6 +119,8 @@ namespace SecretChat
             {
                 while ((bytesRead = await _sslStream.ReadAsync(buffer, 0, buffer.Length)) != 0)
                 {
+                    ChatTextBox.AppendText($"\n Received a message.");
+
                     // Decrypt the message
                     string senderId = Encoding.UTF8.GetString(buffer, 0, bytesRead);
 
@@ -118,8 +129,12 @@ namespace SecretChat
                         byte[] sharedSecret = ecdh.DeriveKeyMaterial(_otherClientsPublicKeys[senderId]);
                         aes.Key = sharedSecret;
 
+                        ChatTextBox.AppendText($"\n Key derived");
+
                         using ICryptoTransform decryptor = aes.CreateDecryptor();
                         byte[] decryptedMessage = decryptor.TransformFinalBlock(buffer, 0, bytesRead);
+
+                        ChatTextBox.AppendText($"\n Message decrypted");
 
                         string message = Encoding.UTF8.GetString(decryptedMessage);
                         Dispatcher.Invoke(() => ChatTextBox.AppendText($"{message}\n"));
@@ -128,13 +143,14 @@ namespace SecretChat
                     {
                         
                         ECDiffieHellmanPublicKey senderPublicKey = ECDiffieHellmanCngPublicKey.FromByteArray(buffer, CngKeyBlobFormat.EccPublicBlob);
-                        ChatTextBox.AppendText($"Added key: {senderPublicKey}");
+                        ChatTextBox.AppendText($"\nAdded key: {senderPublicKey}");
                         _otherClientsPublicKeys.Add(senderId, senderPublicKey);
                     }
                 }
             }
-            catch (IOException)
+            catch (IOException ex)
             {
+                ChatTextBox.AppendText($"\n Connection was closed: {ex.Message}");
                 // The connection was closed
             }
         }
@@ -143,6 +159,8 @@ namespace SecretChat
         {
             if (!string.IsNullOrEmpty(RecipientIdTextBox.Text) && !string.IsNullOrEmpty(MessageTextBox.Text))
             {
+                ChatTextBox.AppendText($"\n Sending a message...");
+
                 byte[] recipientIdBytes = Encoding.UTF8.GetBytes(RecipientIdTextBox.Text);
 
                 // Send the recipient ID
